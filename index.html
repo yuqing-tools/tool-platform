@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内部工具平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f5f6fa;
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        .tool-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+        }
+        .tool-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .tool-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+        }
+        .tool-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 16px;
+        }
+        .tool-name {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        .tool-desc {
+            color: #666;
+            font-size: 0.95em;
+            line-height: 1.6;
+            margin-bottom: 16px;
+        }
+        .tool-version {
+            display: inline-block;
+            background: #e8eaff;
+            color: #667eea;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin-bottom: 16px;
+        }
+        .tool-actions {
+            display: flex;
+            gap: 12px;
+        }
+        .btn {
+            flex: 1;
+            padding: 12px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95em;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+        .btn-secondary {
+            background: #f0f2f5;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #e4e6eb;
+        }
+        .config-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+        .config-title {
+            font-size: 0.9em;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .config-preview {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85em;
+            color: #555;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+            font-size: 0.9em;
+        }
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+            .tool-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>内部工具平台</h1>
+        <p>部门共享工具集 - 统一管理 · 便捷使用</p>
+    </div>
+
+    <div class="container">
+        <div class="tool-grid" id="toolGrid">
+            <!-- 工具卡片将通过 JS 动态加载 -->
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>如有配置问题请联系管理员</p>
+    </div>
+
+    <script>
+        // 工具配置 - 从这里加载所有工具信息
+        const TOOLS_CONFIG = {
+            "tools": [
+                {
+                    "id": "mengniu-sentiment",
+                    "name": "蒙牛舆情数据整理工具",
+                    "icon": "📊",
+                    "description": "自动分类整理舆情数据，支持蒙牛/伊利/竞品/行业分类，智能关键词识别，链接去重等。",
+                    "version": "v3.6",
+                    "author": "EDY",
+                    "download": {
+                        "exe": "./tools/mengniu-sentiment/舆情数据整理工具.exe",
+                        "config": "./tools/mengniu-sentiment/config.json"
+                    },
+                    "configPreview": {
+                        "竞品数量": "150+",
+                        "分类方式": "标题优先+摘要补充",
+                        "发布日期格式": "yyyy/mm/dd hh:mm:ss"
+                    }
+                }
+            ]
+        };
+
+        // 渲染工具卡片
+        function renderTools() {
+            const grid = document.getElementById('toolGrid');
+
+            TOOLS_CONFIG.tools.forEach(tool => {
+                const card = document.createElement('div');
+                card.className = 'tool-card';
+
+                // 构建配置预览 HTML
+                let configPreviewHTML = '';
+                if (tool.configPreview) {
+                    configPreviewHTML = `
+                        <div class="config-section">
+                            <div class="config-title">当前配置</div>
+                            <div class="config-preview">
+                                ${Object.entries(tool.configPreview).map(([k, v]) => `${k}: ${v}`).join('<br>')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                card.innerHTML = `
+                    <div class="tool-icon">${tool.icon}</div>
+                    <div class="tool-name">${tool.name}</div>
+                    <span class="tool-version">${tool.version}</span>
+                    <p class="tool-desc">${tool.description}</p>
+                    ${configPreviewHTML}
+                    <div class="tool-actions">
+                        <a href="${tool.download.exe}" class="btn btn-primary" download>下载 exe</a>
+                        <a href="${tool.download.config}" class="btn btn-secondary" target="_blank">查看配置</a>
+                    </div>
+                `;
+
+                grid.appendChild(card);
+            });
+        }
+
+        // 页面加载时渲染
+        document.addEventListener('DOMContentLoaded', renderTools);
+    </script>
+</body>
+</html>
