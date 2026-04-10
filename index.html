@@ -118,13 +118,39 @@
             font-size: 0.9em;
             margin-bottom: 20px;
         }
+        .upload-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .upload-box {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #eee;
+        }
+        .upload-box-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .upload-box-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .upload-box-hint {
+            font-size: 0.85em;
+            color: #888;
+        }
         .upload-area {
             border: 2px dashed #ddd;
             border-radius: 12px;
-            padding: 40px 20px;
+            padding: 30px 20px;
             text-align: center;
-            margin-bottom: 20px;
             transition: all 0.2s;
+            cursor: pointer;
         }
         .upload-area:hover {
             border-color: #667eea;
@@ -133,6 +159,34 @@
         .upload-area.dragover {
             border-color: #667eea;
             background: #f0f2ff;
+        }
+        .file-preview {
+            margin-top: 12px;
+            min-height: 40px;
+        }
+        .file-preview-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: #f0fdf4;
+            border-radius: 8px;
+            border: 1px solid #bbf7d0;
+        }
+        .file-preview-item .file-name {
+            color: #166534;
+            font-weight: 500;
+        }
+        .file-preview-item .file-size {
+            color: #999;
+            font-size: 0.85em;
+            margin-left: 8px;
+        }
+        .file-preview-empty {
+            color: #ccc;
+            text-align: center;
+            padding: 10px;
+            font-size: 0.9em;
         }
         .upload-icon {
             font-size: 48px;
@@ -341,14 +395,37 @@
             <div class="tool-title" id="toolTitle">工具名称</div>
             <div class="tool-meta" id="toolMeta">v1.0 · 作者</div>
 
-            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                <div class="upload-icon">📁</div>
-                <div class="upload-text">点击或拖拽文件到此处上传</div>
-                <div class="upload-hint" id="uploadHint">支持 xlsx 格式</div>
-                <input type="file" id="fileInput" class="file-input" accept=".xlsx,.xls" multiple>
-            </div>
+            <div class="upload-section">
+                <!-- 今日数据上传 -->
+                <div class="upload-box" id="uploadArea1">
+                    <div class="upload-box-header">
+                        <span class="upload-box-title">1. 今日数据</span>
+                        <span class="upload-box-hint">系统24小时收藏的数据</span>
+                    </div>
+                    <div class="upload-area" onclick="document.getElementById('fileInput1').click()">
+                        <div class="upload-icon">📄</div>
+                        <div class="upload-text">点击或拖拽上传</div>
+                        <div class="upload-hint">xlsx 格式</div>
+                    </div>
+                    <input type="file" id="fileInput1" class="file-input" accept=".xlsx,.xls">
+                    <div class="file-preview" id="filePreview1"></div>
+                </div>
 
-            <div class="selected-files" id="selectedFiles"></div>
+                <!-- 待填表上传 -->
+                <div class="upload-box" id="uploadArea2">
+                    <div class="upload-box-header">
+                        <span class="upload-box-title">2. 待填表</span>
+                        <span class="upload-box-hint">上个班次的成品表</span>
+                    </div>
+                    <div class="upload-area" onclick="document.getElementById('fileInput2').click()">
+                        <div class="upload-icon">📋</div>
+                        <div class="upload-text">点击或拖拽上传</div>
+                        <div class="upload-hint">xlsx 格式</div>
+                    </div>
+                    <input type="file" id="fileInput2" class="file-input" accept=".xlsx,.xls">
+                    <div class="file-preview" id="filePreview2"></div>
+                </div>
+            </div>
 
             <button class="run-btn" id="runBtn" onclick="runTool()" disabled>开始处理</button>
 
@@ -381,10 +458,11 @@
     <script>
         // 全局变量
         let currentTool = null;
-        let uploadedFiles = [];
+        let todayDataFile = null;  // 今日数据
+        let templateFile = null;   // 待填表
         let processedWorkbook = null;
 
-        // 工具配置（内嵌，GitHub Pages 静态加载）
+        // 工具配置
         const TOOLS_CONFIG = [
             {
                 id: 'mengniu-sentiment',
@@ -393,7 +471,6 @@
                 description: '自动分类整理舆情数据，支持蒙牛/伊利/竞品/行业分类，智能关键词识别，链接去重。',
                 version: 'v3.6',
                 author: 'EDY',
-                inputHint: '上传 今日数据.xlsx 和 待填表.xlsx',
                 config: {
                     '分类优先级': '标题优先 → 摘要补充',
                     '竞品数量': '150+ 品牌',
@@ -431,7 +508,6 @@
 
             document.getElementById('toolTitle').textContent = currentTool.name;
             document.getElementById('toolMeta').textContent = `${currentTool.version} · ${currentTool.author}`;
-            document.getElementById('uploadHint').textContent = currentTool.inputHint;
 
             // 渲染配置
             const configList = document.getElementById('configList');
@@ -440,8 +516,10 @@
             ).join('');
 
             // 重置状态
-            uploadedFiles = [];
-            document.getElementById('selectedFiles').innerHTML = '';
+            todayDataFile = null;
+            templateFile = null;
+            document.getElementById('filePreview1').innerHTML = '<div class="file-preview-empty">未上传文件</div>';
+            document.getElementById('filePreview2').innerHTML = '<div class="file-preview-empty">未上传文件</div>';
             document.getElementById('runBtn').disabled = true;
             document.getElementById('resultArea').classList.remove('active');
             document.getElementById('errorArea').classList.remove('active');
@@ -456,65 +534,84 @@
 
         // 设置上传事件
         function setupUploadEvents() {
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
+            // 文件1（今日数据）
+            const uploadArea1 = document.getElementById('uploadArea1');
+            const fileInput1 = document.getElementById('fileInput1');
 
-            uploadArea.addEventListener('dragover', (e) => {
+            uploadArea1.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                uploadArea.classList.add('dragover');
+                uploadArea1.classList.add('dragover');
             });
-
-            uploadArea.addEventListener('dragleave', () => {
-                uploadArea.classList.remove('dragover');
+            uploadArea1.addEventListener('dragleave', () => {
+                uploadArea1.classList.remove('dragover');
             });
-
-            uploadArea.addEventListener('drop', (e) => {
+            uploadArea1.addEventListener('drop', (e) => {
                 e.preventDefault();
-                uploadArea.classList.remove('dragover');
-                handleFiles(e.dataTransfer.files);
+                uploadArea1.classList.remove('dragover');
+                handleFile1(e.dataTransfer.files[0]);
+            });
+            fileInput1.addEventListener('change', (e) => {
+                if (e.target.files[0]) handleFile1(e.target.files[0]);
             });
 
-            fileInput.addEventListener('change', (e) => {
-                handleFiles(e.target.files);
+            // 文件2（待填表）
+            const uploadArea2 = document.getElementById('uploadArea2');
+            const fileInput2 = document.getElementById('fileInput2');
+
+            uploadArea2.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea2.classList.add('dragover');
+            });
+            uploadArea2.addEventListener('dragleave', () => {
+                uploadArea2.classList.remove('dragover');
+            });
+            uploadArea2.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea2.classList.remove('dragover');
+                handleFile2(e.dataTransfer.files[0]);
+            });
+            fileInput2.addEventListener('change', (e) => {
+                if (e.target.files[0]) handleFile2(e.target.files[0]);
             });
         }
 
-        // 处理文件
-        function handleFiles(files) {
-            for (const file of files) {
-                if (!file.name.match(/\.(xlsx|xls)$/i)) continue;
-                if (uploadedFiles.find(f => f.name === file.name)) continue;
-                uploadedFiles.push(file);
-            }
-            renderSelectedFiles();
-            document.getElementById('runBtn').disabled = uploadedFiles.length === 0;
-        }
-
-        // 渲染已选文件
-        function renderSelectedFiles() {
-            const container = document.getElementById('selectedFiles');
-            container.innerHTML = uploadedFiles.map((file, index) => `
-                <div class="file-item">
-                    <div class="file-item-name">
-                        <span>📄</span>
-                        <span>${file.name}</span>
-                        <span class="file-item-size">(${(file.size / 1024).toFixed(1)} KB)</span>
-                    </div>
-                    <button class="file-item-remove" onclick="removeFile(${index})">×</button>
+        // 处理今日数据文件
+        function handleFile1(file) {
+            if (!file || !file.name.match(/\.(xlsx|xls)$/i)) return;
+            todayDataFile = file;
+            const preview = document.getElementById('filePreview1');
+            preview.innerHTML = `
+                <div class="file-preview-item">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">(${(file.size / 1024).toFixed(1)} KB)</span>
                 </div>
-            `).join('');
+            `;
+            updateRunButton();
         }
 
-        // 移除文件
-        function removeFile(index) {
-            uploadedFiles.splice(index, 1);
-            renderSelectedFiles();
-            document.getElementById('runBtn').disabled = uploadedFiles.length === 0;
+        // 处理待填表文件
+        function handleFile2(file) {
+            if (!file || !file.name.match(/\.(xlsx|xls)$/i)) return;
+            templateFile = file;
+            const preview = document.getElementById('filePreview2');
+            preview.innerHTML = `
+                <div class="file-preview-item">
+                    <span class="file-name">${file.name}</span>
+                    <span class="file-size">(${(file.size / 1024).toFixed(1)} KB)</span>
+                </div>
+            `;
+            updateRunButton();
+        }
+
+        // 更新开始按钮状态
+        function updateRunButton() {
+            const btn = document.getElementById('runBtn');
+            btn.disabled = !(todayDataFile && templateFile);
         }
 
         // 运行工具
         async function runTool() {
-            if (!currentTool || uploadedFiles.length === 0) return;
+            if (!currentTool || !todayDataFile || !templateFile) return;
 
             const runBtn = document.getElementById('runBtn');
             const progressArea = document.getElementById('progressArea');
@@ -529,20 +626,19 @@
             try {
                 updateProgress(0, '正在读取文件...');
 
-                // 读取所有文件
-                const workbooks = [];
-                for (const file of uploadedFiles) {
-                    const data = await readFileAsync(file);
-                    const wb = XLSX.read(data, { type: 'array' });
-                    workbooks.push({ name: file.name, wb });
-                }
+                // 读取两个文件
+                const data1 = await readFileAsync(todayDataFile);
+                const wb1 = XLSX.read(data1, { type: 'array' });
+
+                const data2 = await readFileAsync(templateFile);
+                const wb2 = XLSX.read(data2, { type: 'array' });
 
                 // 根据工具ID处理
                 updateProgress(30, '正在处理数据...');
 
                 let result;
                 if (currentTool.id === 'mengniu-sentiment') {
-                    result = await processMengniuTool(workbooks, updateProgress);
+                    result = await processMengniuTool({ todayData: wb1, template: wb2 }, updateProgress);
                 }
 
                 updateProgress(90, '正在生成结果...');
@@ -594,10 +690,34 @@
         // ============ 舆情工具处理逻辑 ============
 
         async function processMengniuTool(workbooks, onProgress) {
-            // 找今日数据文件（第一个sheet）
-            const todayDataWb = workbooks[0].wb;
-            const todaySheet = todayDataWb.Sheets[todayDataWb.SheetNames[0]];
-            const todayData = XLSX.utils.sheet_to_json(todaySheet, { header: 1 });
+            const { todayData, template } = workbooks;
+
+            // 读取今日数据
+            const todaySheet = todayData.Sheets[todayData.SheetNames[0]];
+            const todayDataArray = XLSX.utils.sheet_to_json(todaySheet, { header: 1 });
+
+            // 从待填表收集现有URL（用于去重）
+            const existingUrls = {
+                '蒙牛（提及蒙牛的优先进蒙牛）': new Set(),
+                '伊利': new Set(),
+                '其他竞品': new Set(),
+                '行业': new Set()
+            };
+
+            for (const sheetName of template.SheetNames) {
+                if (sheetName === '数据统计（公式勿动）') continue;
+                const sheet = template.Sheets[sheetName];
+                const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                for (let i = 1; i < data.length; i++) {
+                    const url = data[i][6];
+                    if (url) {
+                        let targetSheet = sheetName;
+                        // URL去重
+                        const normalized = normalizeUrl(url);
+                        if (normalized) existingUrls[targetSheet].add(normalized);
+                    }
+                }
+            }
 
             onProgress(50, '正在分类整理...');
 
@@ -609,21 +729,14 @@
                 '行业': []
             };
 
-            const existingUrls = {
-                '蒙牛（提及蒙牛的优先进蒙牛）': new Set(),
-                '伊利': new Set(),
-                '其他竞品': new Set(),
-                '行业': new Set()
-            };
-
             const todayDate = new Date();
             const todayDateStr = `${todayDate.getFullYear()}/${String(todayDate.getMonth() + 1).padStart(2, '0')}/${String(todayDate.getDate()).padStart(2, '0')}`;
 
             let skipped = 0;
 
             // 跳过表头，从第2行开始
-            for (let i = 1; i < todayData.length; i++) {
-                const row = todayData[i];
+            for (let i = 1; i < todayDataArray.length; i++) {
+                const row = todayDataArray[i];
                 const title = row[1];
                 const summary = row[2];
 
