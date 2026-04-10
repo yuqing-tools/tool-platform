@@ -160,6 +160,14 @@
             border-color: #667eea;
             background: #f0f2ff;
         }
+        .upload-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .upload-text {
+            color: #666;
+            font-size: 0.95em;
+        }
         .file-preview {
             margin-top: 12px;
             min-height: 40px;
@@ -176,66 +184,13 @@
         .file-preview-item .file-name {
             color: #166534;
             font-weight: 500;
-        }
-        .file-preview-item .file-size {
-            color: #999;
-            font-size: 0.85em;
-            margin-left: 8px;
+            font-size: 0.9em;
         }
         .file-preview-empty {
             color: #ccc;
             text-align: center;
             padding: 10px;
             font-size: 0.9em;
-        }
-        .upload-icon {
-            font-size: 48px;
-            margin-bottom: 16px;
-        }
-        .upload-text {
-            color: #666;
-            margin-bottom: 12px;
-        }
-        .upload-hint {
-            color: #999;
-            font-size: 0.85em;
-        }
-        .file-input {
-            display: none;
-        }
-        .selected-files {
-            margin-bottom: 20px;
-        }
-        .file-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 12px 16px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-        .file-item-name {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .file-item-name span {
-            color: #333;
-        }
-        .file-item-size {
-            color: #999;
-            font-size: 0.85em;
-        }
-        .file-item-remove {
-            background: none;
-            border: none;
-            color: #999;
-            cursor: pointer;
-            font-size: 1.2em;
-        }
-        .file-item-remove:hover {
-            color: #f44336;
         }
         .run-btn {
             width: 100%;
@@ -397,33 +352,31 @@
 
             <div class="upload-section">
                 <!-- 今日数据上传 -->
-                <div class="upload-box" id="uploadArea1">
+                <div class="upload-box">
                     <div class="upload-box-header">
                         <span class="upload-box-title">1. 今日数据</span>
                         <span class="upload-box-hint">系统24小时收藏的数据</span>
                     </div>
-                    <div class="upload-area" onclick="document.getElementById('fileInput1').click()">
+                    <div class="upload-area" id="uploadArea1" onclick="document.getElementById('fileInput1').click()">
                         <div class="upload-icon">📄</div>
                         <div class="upload-text">点击或拖拽上传</div>
-                        <div class="upload-hint">xlsx 格式</div>
                     </div>
                     <input type="file" id="fileInput1" class="file-input" accept=".xlsx,.xls">
-                    <div class="file-preview" id="filePreview1"></div>
+                    <div class="file-preview" id="filePreview1"><div class="file-preview-empty">未上传文件</div></div>
                 </div>
 
                 <!-- 待填表上传 -->
-                <div class="upload-box" id="uploadArea2">
+                <div class="upload-box">
                     <div class="upload-box-header">
                         <span class="upload-box-title">2. 待填表</span>
                         <span class="upload-box-hint">上个班次的成品表</span>
                     </div>
-                    <div class="upload-area" onclick="document.getElementById('fileInput2').click()">
+                    <div class="upload-area" id="uploadArea2" onclick="document.getElementById('fileInput2').click()">
                         <div class="upload-icon">📋</div>
                         <div class="upload-text">点击或拖拽上传</div>
-                        <div class="upload-hint">xlsx 格式</div>
                     </div>
                     <input type="file" id="fileInput2" class="file-input" accept=".xlsx,.xls">
-                    <div class="file-preview" id="filePreview2"></div>
+                    <div class="file-preview" id="filePreview2"><div class="file-preview-empty">未上传文件</div></div>
                 </div>
             </div>
 
@@ -458,8 +411,8 @@
     <script>
         // 全局变量
         let currentTool = null;
-        let todayDataFile = null;  // 今日数据
-        let templateFile = null;   // 待填表
+        let todayDataFile = null;
+        let templateFile = null;
         let processedWorkbook = null;
 
         // 工具配置
@@ -548,7 +501,7 @@
             uploadArea1.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea1.classList.remove('dragover');
-                handleFile1(e.dataTransfer.files[0]);
+                if (e.dataTransfer.files[0]) handleFile1(e.dataTransfer.files[0]);
             });
             fileInput1.addEventListener('change', (e) => {
                 if (e.target.files[0]) handleFile1(e.target.files[0]);
@@ -568,7 +521,7 @@
             uploadArea2.addEventListener('drop', (e) => {
                 e.preventDefault();
                 uploadArea2.classList.remove('dragover');
-                handleFile2(e.dataTransfer.files[0]);
+                if (e.dataTransfer.files[0]) handleFile2(e.dataTransfer.files[0]);
             });
             fileInput2.addEventListener('change', (e) => {
                 if (e.target.files[0]) handleFile2(e.target.files[0]);
@@ -580,12 +533,7 @@
             if (!file || !file.name.match(/\.(xlsx|xls)$/i)) return;
             todayDataFile = file;
             const preview = document.getElementById('filePreview1');
-            preview.innerHTML = `
-                <div class="file-preview-item">
-                    <span class="file-name">${file.name}</span>
-                    <span class="file-size">(${(file.size / 1024).toFixed(1)} KB)</span>
-                </div>
-            `;
+            preview.innerHTML = `<div class="file-preview-item"><span class="file-name">${file.name}</span></div>`;
             updateRunButton();
         }
 
@@ -594,12 +542,7 @@
             if (!file || !file.name.match(/\.(xlsx|xls)$/i)) return;
             templateFile = file;
             const preview = document.getElementById('filePreview2');
-            preview.innerHTML = `
-                <div class="file-preview-item">
-                    <span class="file-name">${file.name}</span>
-                    <span class="file-size">(${(file.size / 1024).toFixed(1)} KB)</span>
-                </div>
-            `;
+            preview.innerHTML = `<div class="file-preview-item"><span class="file-name">${file.name}</span></div>`;
             updateRunButton();
         }
 
@@ -607,6 +550,22 @@
         function updateRunButton() {
             const btn = document.getElementById('runBtn');
             btn.disabled = !(todayDataFile && templateFile);
+        }
+
+        // 读取文件为 ArrayBuffer
+        function readFileAsync(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // 更新进度
+        function updateProgress(percent, text) {
+            document.getElementById('progressFill').style.width = percent + '%';
+            document.getElementById('progressText').textContent = text;
         }
 
         // 运行工具
@@ -624,28 +583,29 @@
             errorArea.classList.remove('active');
 
             try {
-                updateProgress(0, '正在读取文件...');
+                updateProgress(10, '正在读取文件...');
 
-                // 读取两个文件
+                // 读取今日数据
                 const data1 = await readFileAsync(todayDataFile);
-                const wb1 = XLSX.read(data1, { type: 'array' });
+                const todayWorkbook = XLSX.read(data1, { type: 'array', cellDates: true });
 
+                updateProgress(30, '正在读取待填表...');
+
+                // 读取待填表
                 const data2 = await readFileAsync(templateFile);
-                const wb2 = XLSX.read(data2, { type: 'array' });
+                const templateWorkbook = XLSX.read(data2, { type: 'array', cellDates: true });
 
-                // 根据工具ID处理
-                updateProgress(30, '正在处理数据...');
+                updateProgress(50, '正在处理数据...');
 
+                // 处理数据
                 let result;
                 if (currentTool.id === 'mengniu-sentiment') {
-                    result = await processMengniuTool({ todayData: wb1, template: wb2 }, updateProgress);
+                    result = processMengniuTool(todayWorkbook, templateWorkbook);
                 }
 
                 updateProgress(90, '正在生成结果...');
 
-                // 创建输出文件
-                const output = createOutputFile(result);
-                processedWorkbook = output;
+                processedWorkbook = result.workbook;
 
                 updateProgress(100, '处理完成！');
 
@@ -671,150 +631,6 @@
             runBtn.disabled = false;
         }
 
-        // 读取文件为 ArrayBuffer
-        function readFileAsync(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (e) => resolve(e.target.result);
-                reader.onerror = reject;
-                reader.readAsArrayBuffer(file);
-            });
-        }
-
-        // 更新进度
-        function updateProgress(percent, text) {
-            document.getElementById('progressFill').style.width = percent + '%';
-            document.getElementById('progressText').textContent = text;
-        }
-
-        // ============ 舆情工具处理逻辑 ============
-
-        async function processMengniuTool(workbooks, onProgress) {
-            const { todayData, template } = workbooks;
-
-            // 读取今日数据
-            const todaySheet = todayData.Sheets[todayData.SheetNames[0]];
-            const todayDataArray = XLSX.utils.sheet_to_json(todaySheet, { header: 1 });
-
-            // 从待填表收集现有URL（用于去重）
-            const existingUrls = {
-                '蒙牛（提及蒙牛的优先进蒙牛）': new Set(),
-                '伊利': new Set(),
-                '其他竞品': new Set(),
-                '行业': new Set()
-            };
-
-            for (const sheetName of template.SheetNames) {
-                if (sheetName === '数据统计（公式勿动）') continue;
-                const sheet = template.Sheets[sheetName];
-                const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-                for (let i = 1; i < data.length; i++) {
-                    const url = data[i][6];
-                    if (url) {
-                        let targetSheet = sheetName;
-                        // URL去重
-                        const normalized = normalizeUrl(url);
-                        if (normalized) existingUrls[targetSheet].add(normalized);
-                    }
-                }
-            }
-
-            onProgress(50, '正在分类整理...');
-
-            // 处理数据
-            const results = {
-                '蒙牛（提及蒙牛的优先进蒙牛）': [],
-                '伊利': [],
-                '其他竞品': [],
-                '行业': []
-            };
-
-            const todayDate = new Date();
-            const todayDateStr = `${todayDate.getFullYear()}/${String(todayDate.getMonth() + 1).padStart(2, '0')}/${String(todayDate.getDate()).padStart(2, '0')}`;
-
-            let skipped = 0;
-
-            // 跳过表头，从第2行开始
-            for (let i = 1; i < todayDataArray.length; i++) {
-                const row = todayDataArray[i];
-                const title = row[1];
-                const summary = row[2];
-
-                const { category, brand } = classifyByKeywords(title, summary);
-
-                let targetSheet;
-                if (category === '蒙牛') {
-                    targetSheet = '蒙牛（提及蒙牛的优先进蒙牛）';
-                } else if (category === '伊利') {
-                    targetSheet = '伊利';
-                } else if (category === '竞品') {
-                    targetSheet = '其他竞品';
-                } else {
-                    targetSheet = '行业';
-                }
-
-                // URL去重
-                const currentUrl = row[6];
-                if (currentUrl) {
-                    const normalized = normalizeUrl(currentUrl);
-                    if (existingUrls[targetSheet].has(normalized)) {
-                        skipped++;
-                        continue;
-                    }
-                    existingUrls[targetSheet].add(normalized);
-                }
-
-                // 处理发布时间
-                let pubTimeStr = row[3];
-                const pubTime = parseDatetime(row[3]);
-                if (pubTime) {
-                    pubTimeStr = `${pubTime.getFullYear()}/${String(pubTime.getMonth() + 1).padStart(2, '0')}/${String(pubTime.getDate()).padStart(2, '0')} ${String(pubTime.getHours()).padStart(2, '0')}:${String(pubTime.getMinutes()).padStart(2, '0')}:${String(pubTime.getSeconds()).padStart(2, '0')}`;
-                }
-
-                results[targetSheet].push({
-                    序号: '',
-                    标题: row[1],
-                    摘要: row[2],
-                    发布时间: pubTimeStr,
-                    发布人: row[4],
-                    发布平台: row[5],
-                    原文链接: convertHttpsToHttp(row[6]),
-                    报送时间: todayDateStr,
-                    情感属性: row[7] || '',
-                    竞品品类: category === '竞品' ? brand : ''
-                });
-            }
-
-            // 重新编号
-            let seq = 1;
-            for (const sheet of Object.keys(results)) {
-                for (const row of results[sheet]) {
-                    row.序号 = seq++;
-                }
-            }
-
-            return { results, skipped, stats: {
-                '蒙牛': results['蒙牛（提及蒙牛的优先进蒙牛）'].length,
-                '伊利': results['伊利'].length,
-                '其他竞品': results['其他竞品'].length,
-                '行业': results['行业'].length
-            }};
-        }
-
-        // 创建输出文件
-        function createOutputFile(result) {
-            const wb = XLSX.utils.book_new();
-
-            for (const [sheetName, data] of Object.entries(result.results)) {
-                if (data.length > 0) {
-                    const ws = XLSX.utils.json_to_sheet(data);
-                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                }
-            }
-
-            return wb;
-        }
-
         // 下载结果
         document.getElementById('downloadBtn').addEventListener('click', () => {
             if (processedWorkbook) {
@@ -828,6 +644,183 @@
                 URL.revokeObjectURL(url);
             }
         });
+
+        // ============ 舆情工具核心处理逻辑 ============
+
+        function processMengniuTool(todayWorkbook, templateWorkbook) {
+            // 读取今日数据（第一个sheet）
+            const todaySheet = todayWorkbook.Sheets[todayWorkbook.SheetNames[0]];
+            const todayData = XLSX.utils.sheet_to_json(todaySheet, { header: 1 });
+
+            if (todayData.length <= 1) {
+                throw new Error('今日数据为空！');
+            }
+
+            // 收集待填表中各sheet的现有URL（用于去重）
+            const existingUrls = {
+                '蒙牛（提及蒙牛的优先进蒙牛）': new Set(),
+                '伊利': new Set(),
+                '其他竞品': new Set(),
+                '行业': new Set()
+            };
+
+            // 从待填表收集URL
+            for (const sheetName of templateWorkbook.SheetNames) {
+                if (sheetName === '数据统计（公式勿动）') continue;
+                const sheet = templateWorkbook.Sheets[sheetName];
+                const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                for (let i = 1; i < data.length; i++) {
+                    const url = data[i][6]; // G列原文链接
+                    if (url) {
+                        const normalized = normalizeUrl(String(url));
+                        if (normalized && existingUrls[sheetName]) {
+                            existingUrls[sheetName].add(normalized);
+                        }
+                    }
+                }
+            }
+
+            // 转换待填表中所有链接 https -> http
+            for (const sheetName of templateWorkbook.SheetNames) {
+                if (sheetName === '数据统计（公式勿动）') continue;
+                const sheet = templateWorkbook.Sheets[sheetName];
+                const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                for (let i = 1; i < data.length; i++) {
+                    if (data[i][6]) {
+                        data[i][6] = convertHttpsToHttp(data[i][6]);
+                    }
+                }
+                // 重新写入（简化处理）
+                templateWorkbook.Sheets[sheetName] = XLSX.utils.aoa_to_sheet(data);
+            }
+
+            // 记录处理前各sheet的行数
+            const rowCountsBefore = {};
+            for (const sheetName of ['蒙牛（提及蒙牛的优先进蒙牛）', '伊利', '其他竞品', '行业']) {
+                if (templateWorkbook.Sheets[sheetName]) {
+                    const data = XLSX.utils.sheet_to_json(templateWorkbook.Sheets[sheetName], { header: 1 });
+                    rowCountsBefore[sheetName] = data.length - 1; // 减去表头
+                } else {
+                    rowCountsBefore[sheetName] = 0;
+                }
+            }
+
+            // 今日日期
+            const today = new Date();
+            const todayDateStr = `${today.getFullYear()}/${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}`;
+
+            // 新增数据计数
+            const addedCount = {
+                '蒙牛（提及蒙牛的优先进蒙牛）': 0,
+                '伊利': 0,
+                '其他竞品': 0,
+                '行业': 0
+            };
+
+            let skippedCount = 0;
+
+            // 处理每行数据
+            for (let i = 1; i < todayData.length; i++) {
+                const row = todayData[i];
+                const title = row[1];
+                const summary = row[2];
+
+                // 分类
+                const { category, brand } = classifyByKeywords(title, summary);
+
+                // 确定目标sheet
+                let targetSheet;
+                if (category === '蒙牛') {
+                    targetSheet = '蒙牛（提及蒙牛的优先进蒙牛）';
+                } else if (category === '伊利') {
+                    targetSheet = '伊利';
+                } else if (category === '竞品') {
+                    targetSheet = '其他竞品';
+                } else {
+                    targetSheet = '行业';
+                }
+
+                // URL去重检查
+                const currentUrl = row[6];
+                if (currentUrl) {
+                    const normalized = normalizeUrl(String(currentUrl));
+                    if (normalized && existingUrls[targetSheet].has(normalized)) {
+                        skippedCount++;
+                        continue;
+                    }
+                    existingUrls[targetSheet].add(normalized);
+                }
+
+                // 转换https为http
+                const urlFixed = convertHttpsToHttp(currentUrl);
+
+                // 处理发布时间
+                const pubTime = parseDatetime(row[3]);
+                let pubTimeStr = row[3];
+                if (pubTime) {
+                    pubTimeStr = `${pubTime.getFullYear()}/${String(pubTime.getMonth() + 1).padStart(2, '0')}/${String(pubTime.getDate()).padStart(2, '0')} ${String(pubTime.getHours()).padStart(2, '0')}:${String(pubTime.getMinutes()).padStart(2, '0')}:${String(pubTime.getSeconds()).padStart(2, '0')}`;
+                }
+
+                // 写入数据到对应sheet
+                const sheet = templateWorkbook.Sheets[targetSheet];
+                const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                const newRowIndex = sheetData.length;
+
+                // 写入各列
+                sheetData.push([
+                    null,                          // A列：序号（后面重新编号）
+                    title || null,                 // B列：标题
+                    summary || null,               // C列：摘要
+                    pubTimeStr || null,            // D列：发布时间
+                    row[4] || null,                // E列：发布人
+                    row[5] || null,                // F列：发布平台
+                    urlFixed || null,              // G列：原文链接
+                    todayDateStr,                  // H列：报送时间（今天）
+                    row[7] || null,                // I列：情感属性
+                    null,                          // J列：不填
+                    category === '竞品' ? brand : null  // K列：竞品品类（仅竞品填）
+                ]);
+
+                // 写回sheet
+                templateWorkbook.Sheets[targetSheet] = XLSX.utils.aoa_to_sheet(sheetData);
+                addedCount[targetSheet]++;
+            }
+
+            // 重新编号（所有sheet）
+            const targetSheets = ['蒙牛（提及蒙牛的优先进蒙牛）', '伊利', '其他竞品', '行业'];
+            for (const sheetName of targetSheets) {
+                if (!templateWorkbook.Sheets[sheetName]) continue;
+                const sheetData = XLSX.utils.sheet_to_json(templateWorkbook.Sheets[sheetName], { header: 1 });
+                let seq = 1;
+                for (let i = 1; i < sheetData.length; i++) {
+                    if (sheetData[i][1]) { // B列有值才是有效数据
+                        sheetData[i][0] = seq;
+                        seq++;
+                    } else {
+                        sheetData[i][0] = null;
+                    }
+                }
+                templateWorkbook.Sheets[sheetName] = XLSX.utils.aoa_to_sheet(sheetData);
+            }
+
+            // 计算实际新增
+            const stats = {};
+            for (const sheetName of targetSheets) {
+                const currentCount = templateWorkbook.Sheets[sheetName] ?
+                    XLSX.utils.sheet_to_json(templateWorkbook.Sheets[sheetName], { header: 1 }).length - 1 : 0;
+                const added = currentCount - rowCountsBefore[sheetName];
+                if (added > 0) {
+                    const displayName = sheetName === '蒙牛（提及蒙牛的优先进蒙牛）' ? '蒙牛' : sheetName;
+                    stats[displayName] = added;
+                }
+            }
+
+            return {
+                workbook: templateWorkbook,
+                stats: stats,
+                skipped: skippedCount
+            };
+        }
 
         // ============ 工具函数 ============
 
