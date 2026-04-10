@@ -118,6 +118,33 @@
             font-size: 0.9em;
             margin-bottom: 20px;
         }
+        .mode-section {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+        .mode-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        .mode-options {
+            display: flex;
+            gap: 20px;
+        }
+        .mode-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #333;
+        }
+        .mode-option input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
         .upload-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -350,6 +377,21 @@
             <div class="tool-title" id="toolTitle">工具名称</div>
             <div class="tool-meta" id="toolMeta">v1.0 · 作者</div>
 
+            <!-- 模式选择 -->
+            <div class="mode-section">
+                <div class="mode-title">处理模式</div>
+                <div class="mode-options">
+                    <label class="mode-option">
+                        <input type="radio" name="classifyMode" value="normal" id="modeNormal">
+                        <span>普通模式（数据已分类）</span>
+                    </label>
+                    <label class="mode-option">
+                        <input type="radio" name="classifyMode" value="smart" id="modeSmart" checked>
+                        <span>智能分类模式（自动识别关键词）</span>
+                    </label>
+                </div>
+            </div>
+
             <div class="upload-section">
                 <!-- 今日数据上传 -->
                 <div class="upload-box">
@@ -414,6 +456,7 @@
         let todayDataFile = null;
         let templateFile = null;
         let processedWorkbook = null;
+        let classifyMode = true; // true=智能分类, false=普通模式（用已有分类）
 
         // 工具配置
         const TOOLS_CONFIG = [
@@ -436,6 +479,12 @@
         document.addEventListener('DOMContentLoaded', () => {
             renderToolList();
             setupUploadEvents();
+            // 模式切换事件
+            document.querySelectorAll('input[name="classifyMode"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    classifyMode = e.target.value === 'smart';
+                });
+            });
         });
 
         // 渲染工具列表
@@ -471,6 +520,9 @@
             // 重置状态
             todayDataFile = null;
             templateFile = null;
+            classifyMode = true;
+            document.getElementById('modeSmart').checked = true;
+            document.getElementById('modeNormal').checked = false;
             document.getElementById('filePreview1').innerHTML = '<div class="file-preview-empty">未上传文件</div>';
             document.getElementById('filePreview2').innerHTML = '<div class="file-preview-empty">未上传文件</div>';
             document.getElementById('runBtn').disabled = true;
@@ -600,7 +652,7 @@
                 // 处理数据
                 let result;
                 if (currentTool.id === 'mengniu-sentiment') {
-                    result = processMengniuTool(todayWorkbook, templateWorkbook);
+                    result = processMengniuTool(todayWorkbook, templateWorkbook, classifyMode);
                 }
 
                 updateProgress(90, '正在生成结果...');
@@ -647,7 +699,7 @@
 
         // ============ 舆情工具核心处理逻辑 ============
 
-        function processMengniuTool(todayWorkbook, templateWorkbook) {
+        function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
             // 读取今日数据（第一个sheet）
             const todaySheet = todayWorkbook.Sheets[todayWorkbook.SheetNames[0]];
             const todayData = XLSX.utils.sheet_to_json(todaySheet, { header: 1 });
@@ -726,7 +778,31 @@
                 const summary = row[2];
 
                 // 分类
-                const { category, brand } = classifyByKeywords(title, summary);
+                let category, brand;
+                if (classifyMode) {
+                    // 智能分类模式：关键词匹配
+                    ({ category, brand } = classifyByKeywords(title, summary));
+                } else {
+                    // 普通模式：直接使用数据中已有的分类（row[8]，即第9列）
+                    const originalCategory = row[8];
+                    if (originalCategory === '蒙牛') {
+                        category = '蒙牛';
+                        brand = null;
+                    } else if (originalCategory === '伊利') {
+                        category = '伊利';
+                        brand = null;
+                    } else if (originalCategory === '行业') {
+                        category = '行业';
+                        brand = null;
+                    } else if (originalCategory && originalCategory !== '蒙牛（提及蒙牛的优先进蒙牛）') {
+                        // 其他分类都归入竞品
+                        category = '竞品';
+                        brand = originalCategory;
+                    } else {
+                        category = '行业';
+                        brand = null;
+                    }
+                }
 
                 // 确定目标sheet
                 let targetSheet;
