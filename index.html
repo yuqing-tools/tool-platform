@@ -521,15 +521,21 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
             sheet[`K${newRow}`] = { t: 's', v: brand };
         }
 
-        // 复制refRow的样式到新行
+        // 复制refRow的完整样式到新行（包括字体、颜色、框线等）
         for (let col = 0; col < 11; col++) {
             const colLetter = String.fromCharCode(65 + col); // A-K
             const newCellRef = `${colLetter}${newRow}`;
             const refCellRef = `${colLetter}${refRow}`;
 
-            if (sheet[refCellRef] && sheet[refCellRef].s) {
-                if (!sheet[newCellRef]) sheet[newCellRef] = {};
-                sheet[newCellRef].s = sheet[refCellRef].s;
+            // 获取参考单元格的完整样式对象（包含font、fill、border等）
+            const refStyle = sheet[refCellRef] ? sheet[refCellRef].s : null;
+            if (refStyle) {
+                // 完整克隆样式对象（包括所有嵌套属性）
+                sheet[newCellRef] = {
+                    t: sheet[newCellRef] ? sheet[newCellRef].t : 's',
+                    v: sheet[newCellRef] ? sheet[newCellRef].v : '',
+                    s: JSON.parse(JSON.stringify(refStyle))
+                };
             }
         }
     }
