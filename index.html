@@ -201,7 +201,6 @@ function showToolDetail(toolId) {
         `<div class="config-item"><span>${k}</span><span>${v}</span></div>`
     ).join('');
 
-    // 重置
     todayDataFile = null;
     templateFile = null;
     classifyMode = true;
@@ -339,7 +338,7 @@ document.getElementById('downloadBtn').addEventListener('click', () => {
 function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
     // 读取今日数据
     const todaySheet = todayWorkbook.Sheets[todayWorkbook.SheetNames[0]];
-    const todayData = XLSX.utils.sheet_to_json(todaySheet, { header: 1 });
+    const todayData = XLSX.utils.sheet_to_json(todaySheet, { header: 1, defval: null });
 
     if (todayData.length <= 1) {
         throw new Error('今日数据为空！');
@@ -357,11 +356,11 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
     for (const sheetName of templateWorkbook.SheetNames) {
         if (sheetName === '数据统计（公式勿动）') continue;
         const sheet = templateWorkbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
         for (let i = 1; i < data.length; i++) {
-            const url = data[i][6];
-            if (url) {
-                const normalized = normalizeUrl(String(url));
+            const row = data[i];
+            if (row && row[6]) {
+                const normalized = normalizeUrl(String(row[6]));
                 if (normalized) existingUrls[sheetName].add(normalized);
             }
         }
@@ -371,24 +370,13 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
     for (const sheetName of templateWorkbook.SheetNames) {
         if (sheetName === '数据统计（公式勿动）') continue;
         const sheet = templateWorkbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        let changed = false;
-        for (let i = 1; i < data.length; i++) {
-            if (data[i][6]) {
-                const fixed = convertHttpsToHttp(data[i][6]);
-                if (fixed !== data[i][6]) {
-                    data[i][6] = fixed;
-                    changed = true;
-                }
+        // 直接遍历sheet的单元格
+        for (const cellAddr of Object.keys(sheet)) {
+            if (cellAddr[0] === '!' ) continue; // 跳过内置属性
+            const cell = sheet[cellAddr];
+            if (cell && cell.t === 's' && cell.v && typeof cell.v === 'string' && cell.v.startsWith('https://')) {
+                cell.v = cell.v.replace('https://', 'http://');
             }
-        }
-        if (changed) {
-            // 重新写入sheet（保持原格式）
-            const newSheet = XLSX.utils.aoa_to_sheet(data);
-            // 保留列宽信息（如果有）
-            if (sheet['!cols']) newSheet['!cols'] = sheet['!cols'];
-            if (sheet['!rows']) newSheet['!rows'] = sheet['!rows'];
-            templateWorkbook.Sheets[sheetName] = newSheet;
         }
     }
 
@@ -396,10 +384,20 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
     const rowCountsBefore = {};
     for (const sheetName of ['蒙牛（提及蒙牛的优先进蒙牛）', '伊利', '其他竞品', '行业']) {
         if (templateWorkbook.Sheets[sheetName]) {
-            const data = XLSX.utils.sheet_to_json(templateWorkbook.Sheets[sheetName], { header: 1 });
             let count = 0;
-            for (let i = 1; i < data.length; i++) {
-                if (data[i] && data[i][1]) count++;
+            const sheet = templateWorkbook.Sheets[sheetName];
+            for (let r = 2; ; r++) {
+                const cellRef = `B${r}`;
+                if (sheet[cellRef] && sheet[cellRef].v) {
+                    count++;
+                } else {
+                    // 检查后面是否还有数据
+                    let hasMore = false;
+                    for (let rr = r + 1; rr < r + 10 && rr < 1000; rr++) {
+                        if (sheet[`B${rr}`] && sheet[`B${rr}`].v) { hasMore = true; break; }
+                    }
+                    if (!hasMore) break;
+                }
             }
             rowCountsBefore[sheetName] = count;
         } else {
@@ -408,10 +406,10 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
     }
 
     // 今日日期
-    const todayDate = new Date();
-    const todayMM = String(todayDate.getMonth() + 1).padStart(2, '0');
-    const todayDD = String(todayDate.getDate()).padStart(2, '0');
-    const todayDateStr = `${todayDate.getFullYear()}/${todayMM}/${todayDD}`;
+    const today = new Date();
+    const todayMM = String(today.getMonth() + 1).padStart(2, '0');
+    const todayDD = String(today.getDate()).padStart(2, '0');
+    const todayDateStr = `${today.getFullYear()}/${todayMM}/${todayDD}`;
 
     let skippedCount = 0;
 
@@ -428,23 +426,17 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
         if (classifyMode) {
             ({ category, brand } = classifyByKeywords(title, summary));
         } else {
-            // 普通模式：直接使用数据中已有的分类（row[8]，即第9列）
             const originalCategory = row[8];
             if (originalCategory === '蒙牛') {
-                category = '蒙牛';
-                brand = null;
+                category = '蒙牛'; brand = null;
             } else if (originalCategory === '伊利') {
-                category = '伊利';
-                brand = null;
+                category = '伊利'; brand = null;
             } else if (originalCategory === '行业') {
-                category = '行业';
-                brand = null;
+                category = '行业'; brand = null;
             } else if (originalCategory && originalCategory !== '蒙牛（提及蒙牛的优先进蒙牛）') {
-                category = '竞品';
-                brand = originalCategory;
+                category = '竞品'; brand = originalCategory;
             } else {
-                category = '行业';
-                brand = null;
+                category = '行业'; brand = null;
             }
         }
 
@@ -460,9 +452,8 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
             targetSheet = '行业';
         }
 
-        // 检查目标sheet是否存在
         if (!templateWorkbook.Sheets[targetSheet]) {
-            console.warn(`警告：目标工作表 '${targetSheet}' 不存在，跳过数据`);
+            console.warn(`警告：目标工作表 '${targetSheet}' 不存在，跳过`);
             continue;
         }
 
@@ -479,60 +470,66 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
             existingUrls[targetSheet].add(normalized);
         }
 
-        // 找到最后一个有数据的行
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        // 找到最后一个有数据的行（从B列判断）
         let lastDataRow = 1;
-        for (let r = 1; r < data.length; r++) {
-            if (data[r] && data[r][1]) {
-                lastDataRow = r + 1;
+        for (let r = 2; r < 10000; r++) {
+            const cellRef = `B${r}`;
+            if (sheet[cellRef] && sheet[cellRef].v) {
+                lastDataRow = r;
+            } else {
+                // 再检查后面几行是否有数据
+                let hasMore = false;
+                for (let rr = r + 1; rr <= r + 5 && rr < 10000; rr++) {
+                    if (sheet[`B${rr}`] && sheet[`B${rr}`].v) { hasMore = true; break; }
+                }
+                if (!hasMore) break;
             }
         }
 
-        const newRowIndex = lastDataRow + 1;
+        const newRow = lastDataRow + 1;
         const refRow = lastDataRow > 1 ? lastDataRow : 2;
 
-        // 构建新行数据（0索引）
-        const newRowData = [
-            null,                      // A列：序号（后面重新编号）
-            row[1] || null,           // B列：标题
-            row[2] || null,           // C列：摘要
-            row[3] || null,           // D列：发布时间
-            row[4] || null,           // E列：发布人
-            row[5] || null,           // F列：发布平台
-            convertHttpsToHttp(row[6]) || null,  // G列：原文链接
-            todayDateStr,             // H列：报送时间（今天日期）
-            row[7] || null,           // I列：情感属性
-            null,                      // J列：不填
-            category === '竞品' ? brand : null  // K列：竞品品类
-        ];
-
-        // 使用 sheet_add_json 写入，保持格式
-        const jsonData = [newRowData];
-        XLSX.utils.sheet_add_json(sheet, jsonData, { skipHeader: true, origin: newRowIndex });
-
-        // 设置发布时间的格式
-        const dCellRef = `D${newRowIndex}`;
-        if (sheet[dCellRef]) {
-            sheet[dCellRef].t = 'd';
-            sheet[dCellRef].z = 'yyyy/mm/dd hh:mm:ss';
+        // 写入数据到各列（直接操作单元格）
+        // A列：序号（暂不写，后面重新编号）
+        // B列：标题
+        sheet[`B${newRow}`] = { t: 's', v: row[1] || '' };
+        // C列：摘要
+        sheet[`C${newRow}`] = { t: 's', v: row[2] || '' };
+        // D列：发布时间
+        if (row[3]) {
+            const pubTime = parseDatetime(row[3]);
+            if (pubTime) {
+                sheet[`D${newRow}`] = { t: 'd', v: pubTime, z: 'yyyy/mm/dd hh:mm:ss' };
+            } else {
+                sheet[`D${newRow}`] = { t: 's', v: String(row[3]) };
+            }
+        }
+        // E列：发布人
+        sheet[`E${newRow}`] = { t: 's', v: row[4] || '' };
+        // F列：发布平台
+        sheet[`F${newRow}`] = { t: 's', v: row[5] || '' };
+        // G列：原文链接（https转http）
+        const linkUrl = row[6] ? String(row[6]).replace('https://', 'http://') : '';
+        sheet[`G${newRow}`] = { t: 's', v: linkUrl };
+        // H列：报送时间（今天日期，只有日期部分）
+        sheet[`H${newRow}`] = { t: 'd', v: new Date(today.getFullYear(), today.getMonth(), today.getDate()), z: 'yyyy/mm/dd' };
+        // I列：情感属性
+        sheet[`I${newRow}`] = { t: 's', v: row[7] || '' };
+        // J列：不填
+        // K列：竞品品类（仅竞品填）
+        if (category === '竞品' && brand) {
+            sheet[`K${newRow}`] = { t: 's', v: brand };
         }
 
-        // 设置报送时间的格式
-        const hCellRef = `H${newRowIndex}`;
-        if (sheet[hCellRef]) {
-            sheet[hCellRef].t = 'd';
-            sheet[hCellRef].z = 'yyyy/mm/dd';
-        }
-
-        // 复制 refRow 的样式到新行
+        // 复制refRow的样式到新行
         for (let col = 0; col < 11; col++) {
             const colLetter = String.fromCharCode(65 + col); // A-K
-            const cellRef = `${colLetter}${newRowIndex}`;
+            const newCellRef = `${colLetter}${newRow}`;
             const refCellRef = `${colLetter}${refRow}`;
 
             if (sheet[refCellRef] && sheet[refCellRef].s) {
-                if (!sheet[cellRef]) sheet[cellRef] = {};
-                sheet[cellRef].s = sheet[refCellRef].s;
+                if (!sheet[newCellRef]) sheet[newCellRef] = {};
+                sheet[newCellRef].s = sheet[refCellRef].s;
             }
         }
     }
@@ -542,20 +539,20 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
     for (const sheetName of targetSheets) {
         if (!templateWorkbook.Sheets[sheetName]) continue;
         const sheet = templateWorkbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
         let seq = 1;
-        for (let i = 1; i < data.length; i++) {
-            const cellRef = `A${i + 1}`;
-            if (data[i] && data[i][1]) {
-                if (!sheet[cellRef]) sheet[cellRef] = {};
-                sheet[cellRef].t = 'n';
-                sheet[cellRef].v = seq;
+        for (let r = 2; r < 10000; r++) {
+            const cellRef = `B${r}`;
+            if (sheet[cellRef] && sheet[cellRef].v) {
+                sheet[`A${r}`] = { t: 'n', v: seq };
                 seq++;
             } else {
-                if (!sheet[cellRef]) sheet[cellRef] = {};
-                sheet[cellRef].t = 's';
-                sheet[cellRef].v = '';
+                // 检查是否结束
+                let hasMore = false;
+                for (let rr = r + 1; rr <= r + 10 && rr < 10000; rr++) {
+                    if (sheet[`B${rr}`] && sheet[`B${rr}`].v) { hasMore = true; break; }
+                }
+                if (!hasMore) break;
             }
         }
     }
@@ -564,10 +561,19 @@ function processMengniuTool(todayWorkbook, templateWorkbook, classifyMode) {
     const stats = {};
     for (const sheetName of targetSheets) {
         if (!templateWorkbook.Sheets[sheetName]) continue;
-        const data = XLSX.utils.sheet_to_json(templateWorkbook.Sheets[sheetName], { header: 1 });
         let count = 0;
-        for (let i = 1; i < data.length; i++) {
-            if (data[i] && data[i][1]) count++;
+        const sheet = templateWorkbook.Sheets[sheetName];
+        for (let r = 2; r < 10000; r++) {
+            const cellRef = `B${r}`;
+            if (sheet[cellRef] && sheet[cellRef].v) {
+                count++;
+            } else {
+                let hasMore = false;
+                for (let rr = r + 1; rr <= r + 10 && rr < 10000; rr++) {
+                    if (sheet[`B${rr}`] && sheet[`B${rr}`].v) { hasMore = true; break; }
+                }
+                if (!hasMore) break;
+            }
         }
         const added = count - rowCountsBefore[sheetName];
         if (added > 0) {
@@ -611,11 +617,6 @@ function classifyByKeywords(title, summary) {
     return { category: '行业', brand: null };
 }
 
-function convertHttpsToHttp(url) {
-    if (url && typeof url === 'string') return url.replace('https://', 'http://');
-    return url;
-}
-
 function normalizeUrl(url) {
     if (!url || typeof url !== 'string') return '';
     url = url.toLowerCase().trim();
@@ -624,6 +625,26 @@ function normalizeUrl(url) {
     url = url.replace(/\/+$/, '');
     url = url.split('#')[0];
     return url;
+}
+
+function parseDatetime(timeStr) {
+    if (!timeStr) return null;
+    if (timeStr instanceof Date) return timeStr;
+
+    const str = String(timeStr).trim();
+    const dateMatch = str.match(/^(\d{4})[年/-](\d{1,2})[月/-](\d{1,2})/);
+    if (dateMatch) {
+        const [, year, month, day] = dateMatch;
+        const timeMatch = str.match(/(\d{1,2}):(\d{1,2}):?(\d{0,2})?/);
+        let hour = 0, minute = 0, second = 0;
+        if (timeMatch) {
+            hour = parseInt(timeMatch[1]) || 0;
+            minute = parseInt(timeMatch[2]) || 0;
+            second = parseInt(timeMatch[3]) || 0;
+        }
+        return new Date(year, month - 1, day, hour, minute, second);
+    }
+    return null;
 }
 
 // ============ 关键词 ============
